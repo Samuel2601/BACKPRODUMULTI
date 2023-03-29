@@ -1776,7 +1776,7 @@ const registro_compra_manual_estudiante = async function (req, res) {
 
 			data.estado = 'Registrado';
 
-			////////console.log(data);
+			console.log(data);
 			try {
 				let pago = await Pago.create(data);
 				let registro = {};
@@ -1805,7 +1805,7 @@ const registro_compra_manual_estudiante = async function (req, res) {
 								mat = 1;
 							} else {
 								element.estado = element.estado;
-							}ses
+							}
 						}
 
 						let act = await Pension.updateOne(

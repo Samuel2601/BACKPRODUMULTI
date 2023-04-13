@@ -41,6 +41,8 @@ api.get('/obtener_detallespagos_admin/:id',auth.auth,AdminController.obtener_det
 
 api.get('/obtener_detalles_ordenes_estudiante_abono/:id',auth.auth,AdminController.obtener_detalles_ordenes_estudiante_abono);
 
+api.get('/obtener_becas_conf/:id',auth.auth,AdminController.obtener_becas_conf);
+
 api.get('/obtener_detalles_ordenes_rubro/:id',auth.auth,AdminController.obtener_detalles_ordenes_rubro);
 
 

@@ -1353,6 +1353,31 @@ const obtener_detalles_ordenes_estudiante_abono = async function (req, res) {
 		res.status(500).send({ message: 'NoAccess' });
 	}
 };
+const obtener_becas_conf = async function (req, res) {
+	if (req.user) {
+		try {
+			let conn = mongoose.connection.useDb(req.user.base);
+			Pension = conn.model('pension', PensionSchema);
+			Pension_Beca = conn.model('pension_beca', Pension_becaSchema);
+			
+			var id = req.params['id'];
+
+			var becas = await Pension_Beca.find().populate('idpension');
+			let becasconfig=[];
+			becas.forEach(element => {
+				if(element.idpension.idanio_lectivo==id){
+					becasconfig.push(element);
+				}
+			});
+
+			res.status(200).send({ becas, becasconfig });
+		} catch (error) {
+			res.status(200).send({ message: 'Algo salio mal' });
+		}
+	} else {
+		res.status(500).send({ message: 'NoAccess' });
+	}
+};
 const obtener_detalles_ordenes_rubro = async function (req, res) {
 	if (req.user) {
 		try {
@@ -1417,7 +1442,9 @@ const marcar_finalizado_orden = async function (req, res) {
 							//console.log(result);
 							//console.log(result.respuesta.respuestaGenerada);
 							if(result.respuesta.respuestaGenerada=='Transaccion Exitosa'&&result.respuesta.respuestaTransaccion=='OK'){
+								
 								cambiar_estado(id,req.user.base,req.user.sub,data);
+
 								msg=result.respuesta.respuestaGenerada;
 							}else{
 								msg=result.respuesta.respuestaGenerada;
@@ -1475,14 +1502,14 @@ const eliminar_finalizado_orden = async function (req, res) {
 			let registro = {};
 			////////console.log("674:  ",req.user);
 			registro.admin = req.user.sub;
-			registro.tipo = 'Registrado';
+			registro.tipo = 'Devolucion';
 			registro.descripcion = JSON.stringify(data);
 			await Registro.create(registro);
 
 			var pago = await Pago.updateOne(
 				{ _id: id },
 				{
-					estado: 'Registrado',
+					estado: 'Devolucion',
 				}
 			);
 
@@ -1623,7 +1650,138 @@ const eliminar_orden_admin = async function (req, res) {
 			var id = req.params['id'];
 			//registra el pago
 			var pagos = await Pago.findById(id);
+			
 			if(pagos.estado=='Registrado'){
+				
+				//busca los detalles de pago
+				var dpagos = await Dpago.find({ pago: id });
+				try {
+					for (var dp of dpagos) {
+						let aux = await Pension.find({ _id: dp.idpension }).populate('idanio_lectivo');
+						//console.log("DP: 1664",aux);
+						//actualiza el documento con el valor del pago
+						let doc = await Documento.findById({ _id: dp.documento });
+						let new_stock = parseFloat(doc.valor) + parseFloat(dp.valor);
+						let new_pago = doc.npagos - 1;
+						await Documento.updateOne(
+							{ _id: dp.documento },
+							{
+								valor: new_stock,
+								npagos: new_pago,
+							}
+						);
+						//
+						//registro de detalle de pago
+						let registro = {};
+						registro.estudiante = pagos.estudiante;
+						registro.documento = dp.documento;
+						registro.admin = req.user.sub;
+						registro.tipo = 'Elimino';
+						registro.descripcion = JSON.stringify(dp);
+	
+						await Registro.create(registro);
+						if (dp.tipo == 0) {
+							////////console.log(dp.estado.search('Abono'));
+							if (dp.estado.search('Abono') == -1) {
+								await Pension.updateOne(
+									{ _id: dp.idpension },
+									{
+										matricula: 0,
+									}
+								);
+							}
+						} else if(dp.tipo>0&&dp.tipo<=11) {
+							////////console.log(dp.estado.search('Abono'));
+							if (dp.estado.search('Abono') == -1) {
+								
+								//console.log("1700",aux[0]);
+								//var cn = await Config.find().sort({ createdAt: -1 }); //await Config.findById({_id:'61abe55d2dce63583086f108'});
+								let config = aux[0].idanio_lectivo;
+								//let config = await Config.findById({_id:'61abe55d2dce63583086f108'});
+								if (aux[0].condicion_beca == 'Si' && dp.valor != config.pension) {
+									if(aux[0].num_mes_res + 1>aux[0].num_mes_beca){
+										aux[0].num_mes_res=aux[0].num_mes_beca
+									}else{
+										aux[0].num_mes_res=aux[0].num_mes_res+1
+									}
+	
+									if(aux[0].meses-1<=0){
+										aux[0].meses=0
+									}else{
+										aux[0].meses=aux[0].meses-1;
+									}
+	
+									await Pension.updateOne(
+										{ _id: dp.idpension },
+										{
+											meses: aux[0].meses,
+											num_mes_res: aux[0].num_mes_res,
+										}
+									);
+								} else {
+									if(aux[0].meses-1<=0){
+										aux[0].meses=0
+									}else{
+										aux[0].meses=aux[0].meses-1;
+									}
+									await Pension.updateOne(
+										{ _id: dp.idpension },
+										{
+											meses: aux[0].meses,
+										}
+									);
+								}
+							}
+						}else{
+							try {
+								if (dp.estado.search('Abono') == -1) {
+									//var aux = await Pension.find({ _id: dp.idpension }).populate('idanio_lectivo');
+									//console.log(aux);
+									//var cn = await Config.find().sort({ createdAt: -1 }); //await Config.findById({_id:'61abe55d2dce63583086f108'});
+									let config = aux[0].idanio_lectivo;
+									
+									//let config = await Config.findById({_id:'61abe55d2dce63583086f108'});
+									var auxpagos=[];
+									if(config.extrapagos){
+										var auxpagos=JSON.parse(config.extrapagos);
+									}
+									if (auxpagos.find(element=>element.idrubro==dp.tipo)!=undefined) {
+										var arr_rubro=[];
+										if(aux.extrapagos){
+											arr_rubro = JSON.parse(aux.extrapagos);
+										}
+										var rubro = arr_rubro.find(element=>element.idrubro==dp.tipo);
+		
+										arr_rubro.forEach((element,key) => {
+											if(rubro.idrubro==element.idrubro){
+												arr_rubro.splice(key,1);
+											}
+										});
+		
+										await Pension.updateOne(
+											{ _id: dp.idpension },
+											{
+												extrapagos:JSON.stringify(arr_rubro)
+											}
+										);
+									} 
+								}
+							} catch (error) {
+								//console.log(error)
+								res.status(200).send({ message: 'Algo salió mal'+error });
+							}
+							
+						}
+						//await Dpago.findOneAndDelete(dp._id);
+					}
+				} catch (error) {
+					//console.log(error)
+							res.status(200).send({ message: 'Algo salió mal'+error });
+				}
+				
+				//remueve detalles de pago
+				
+				await Dpago.deleteMany({pago:id});
 				let registro = {};
 				////////console.log(req.user);
 				registro.estudiante = pagos.estudiante;
@@ -1633,111 +1791,6 @@ const eliminar_orden_admin = async function (req, res) {
 				await Registro.create(registro);
 				//elimina el pago
 				var pago = await Pago.deleteOne({ _id: id });
-				//busca los detalles de pago
-				var dpagos = await Dpago.find({ pago: id });
-				for (var dp of dpagos) {
-					//actualiza el documento con el valor del pago
-					let doc = await Documento.findById({ _id: dp.documento });
-					let new_stock = parseFloat(doc.valor) + parseFloat(dp.valor);
-					let new_pago = doc.npagos - 1;
-					await Documento.updateOne(
-						{ _id: dp.documento },
-						{
-							valor: new_stock,
-							npagos: new_pago,
-						}
-					);
-					//
-					//registro de detalle de pago
-					let registro = {};
-					registro.estudiante = pagos.estudiante;
-					registro.documento = dp.documento;
-					registro.admin = req.user.sub;
-					registro.tipo = 'Elimino';
-					registro.descripcion = JSON.stringify(dp);
-
-					await Registro.create(registro);
-					if (dp.tipo == 0) {
-						////////console.log(dp.estado.search('Abono'));
-						if (dp.estado.search('Abono') == -1) {
-							await Pension.updateOne(
-								{ _id: dp.idpension },
-								{
-									matricula: 0,
-								}
-							);
-						}
-					} else if(dp.tipo>0&&dp.tipo<=11) {
-						////////console.log(dp.estado.search('Abono'));
-						if (dp.estado.search('Abono') == -1) {
-							var aux = await Pension.find({ _id: dp.idpension }).populate('idanio_lectivo');
-							////////console.log(aux[0]);
-							//var cn = await Config.find().sort({ createdAt: -1 }); //await Config.findById({_id:'61abe55d2dce63583086f108'});
-							let config = aux.idanio_lectivo;
-							//let config = await Config.findById({_id:'61abe55d2dce63583086f108'});
-							if (aux[0].condicion_beca == 'Si' && dp.valor != config.pension) {
-								var dpagosbeca = await Dpago.find({ idpension: dp.idpension, pago: { $ne: id } });
-								////////console.log(dpagosbeca);
-								await Pension.updateOne(
-									{ _id: dp.idpension },
-									{
-										meses: aux[0].meses - 1,
-										num_mes_res: aux[0].num_mes_res + 1,
-									}
-								);
-							} else {
-								await Pension.updateOne(
-									{ _id: dp.idpension },
-									{
-										meses: aux[0].meses - 1,
-									}
-								);
-							}
-						}
-					}else{
-						try {
-							if (dp.estado.search('Abono') == -1) {
-								var aux = await Pension.find({ _id: dp.idpension }).populate('idanio_lectivo');
-								//console.log(aux);
-								//var cn = await Config.find().sort({ createdAt: -1 }); //await Config.findById({_id:'61abe55d2dce63583086f108'});
-								let config = aux[0].idanio_lectivo;
-								
-								//let config = await Config.findById({_id:'61abe55d2dce63583086f108'});
-								var auxpagos=[];
-								if(config.extrapagos){
-									var auxpagos=JSON.parse(config.extrapagos);
-								}
-								if (auxpagos.find(element=>element.idrubro==dp.tipo)!=undefined) {
-									var arr_rubro=[];
-									if(aux.extrapagos){
-										arr_rubro = JSON.parse(aux.extrapagos);
-									}
-									var rubro = arr_rubro.find(element=>element.idrubro==dp.tipo);
-	
-									arr_rubro.forEach((element,key) => {
-										if(rubro.idrubro==element.idrubro){
-											arr_rubro.splice(key,1);
-										}
-									});
-	
-									await Pension.updateOne(
-										{ _id: dp.idpension },
-										{
-											extrapagos:JSON.stringify(arr_rubro)
-										}
-									);
-								} 
-							}
-						} catch (error) {
-							console.log(error)
-						}
-						
-					}
-					//await Dpago.findOneAndDelete(dp._id);
-				}
-				//remueve detalles de pago
-				
-				await Dpago.deleteMany({pago:id});
 
 				res.status(200).send({ message: 'Eliminado con exito' });
 			}else{
@@ -1746,7 +1799,7 @@ const eliminar_orden_admin = async function (req, res) {
 			
 		} catch (error) {
 			console.log(error);
-			res.status(200).send({ message: 'Algo salió mal' });
+			res.status(200).send({ message: 'Algo salió mal'+error });
 		}
 	} else {
 		res.status(500).send({ message: 'NoAccess' });
@@ -1776,7 +1829,7 @@ const registro_compra_manual_estudiante = async function (req, res) {
 
 			data.estado = 'Registrado';
 
-			console.log(data);
+			//console.log(data);
 			try {
 				let pago = await Pago.create(data);
 				let registro = {};
@@ -2203,6 +2256,7 @@ module.exports = {
 	actualizar_config_admin,
 	obtener_pagos_admin,
 	obtener_detalles_ordenes_estudiante_abono,
+	obtener_becas_conf,
 	marcar_finalizado_orden,
 	eliminar_orden_admin,
 	registro_compra_manual_estudiante,

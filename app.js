@@ -46,7 +46,6 @@ mongoose.connect('mongodb://127.0.0.1:27017/Instituciones',{useUnifiedTopology: 
 app.use(bodyparser.urlencoded({limit: '50mb',extended:true}));
 app.use(bodyparser.json({limit: '50mb', extended: true}));
 
-
 app.use((req,res,next)=>{
     res.header('Access-Control-Allow-Origin','*'); 
     res.header('Access-Control-Allow-Headers','Authorization, X-API-KEY, Origin, X-Requested-With, Content-Type, Access-Control-Allow-Request-Method');

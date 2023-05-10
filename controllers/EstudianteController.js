@@ -842,6 +842,8 @@ const obtener_detalles_ordenes_estudiante = async function (req, res) {
 		try {
 			let pago = await Pago.findById({ _id: id }).populate('estudiante').populate('encargado');
 			let detalles = await Dpago.find({ pago: pago._id }).populate('documento').populate('idpension');
+			console.log("1");
+			//soapprueba();
 			res.status(200).send({ data: pago, detalles: detalles });
 		} catch (error) {
 			//////console.log(error);
@@ -851,6 +853,280 @@ const obtener_detalles_ordenes_estudiante = async function (req, res) {
 		res.status(500).send({ message: 'NoAccess' });
 	}
 };
+
+
+
+//const xml = fs.readFileSync('ruta/al/archivo.xml');
+
+const forge = require('node-forge');
+//forge.options.usePureJavaScript = true;
+const { parseString, Builder } = require ('xml2js');
+const fr2 = require('./factura_electronica');
+
+function toJson(xml) {
+	parseString(xml, (err, result) => {
+		if(err){
+			console.log(err);
+		}
+		console.log("String XML",result);
+		return result
+		//toXML(result)
+	});
+}
+
+const soapprueba = async function () {
+	console.log("2");
+	try {
+		
+		
+
+		
+		//GENERAR XML DE FACTURA-------------------------------------
+		var a = fr2.p_generar_factura_xml();
+		//console.log(a);
+		fs.writeFile('./facturas/generados/'+a.clave+'.xml',a.xmlresult.toString({ pretty: true}),  {
+			encoding: "utf8",
+			flag: "w",
+			mode: 0o666
+		  },(error)=>{
+			if (error)
+				console.log(error);
+			else {
+				console.log("XML GENERADO\n");
+				console.log("PREVIO A FIRMA");
+
+				const xml = fs.readFileSync('./facturas/generados/'+a.clave+'.xml','utf8');
+				//console.log(xml);
+				
+				const p12File = fs.readFileSync('./facturas/accesos/DAVID DANIEL PANCHI CANDONGA 020223164208.p12',null);
+				//const buffer = Buffer.from(p12File, 'binary');
+				const pem = forge.util.decode64(p12File.toString('base64'));
+				//console.log(pem);
+				const p12Asn1 = forge.asn1.fromDer(pem);
+				const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, 'DpMaMd919314');
+				const certificate = p12.getBags({bagType: forge.pki.oids.certBag})[forge.pki.oids.certBag][0].cert;
+				const privateKey = p12.getBags({bagType: forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag][0].key;
+
+				const SignedXml = require('xml-crypto').SignedXml;
+				
+				const sig = new SignedXml();
+
+				sig.addReference("//*[local-name(.)='//factura']" , ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"]);
+				sig.signingKey = privateKey;
+				sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+				sig.keyInfoProvider = {
+					getKeyInfo: function (key) {
+						return "<X509Data><X509Certificate>" + forge.util.encode64(certificate) + "</X509Certificate></X509Data>";
+					}
+				};
+				
+				//console.log(xml);
+				const xmlConDoctype = `<!DOCTYPE foo SYSTEM "foo.dtd">\n${xml.toString()}`;
+				console.log(a.xmlresult);
+				const xml2js = require('xml2js');
+				const parser = new xml2js.Parser({trim: true});
+				const documento = parser.parseString(a.xmlresult, (err, result) => {
+					//console.log(xmlConDoctype);
+					if (err) {
+						console.error(err);
+						return;
+					  }
+					 // console.log("Result: ",result);
+					 return result;
+				});
+				console.log("Documento",documento);
+				
+				
+
+				sig.computeSignature(a.xmlresult);
+				console.log("Documento",sig.getSignedXml());
+					const signedXml = sig.getSignedXml();
+					fs.writeFileSync('./facturas/firmados/'+a.clave+'.xml', signedXml);
+
+				//FIRMAR XML DE FACTURA
+				fs.open('./facturas/generados/'+a.clave+'.xml', 'r', function(err,factura) {
+					if(err!=undefined){
+						console.log(err);
+					}
+					
+
+
+/*
+					fr2.p_generar_xades_bes(factura, function(factura_firmada, claveAcceso){
+
+						fs.writeFile('./facturas/firmados/'+claveAcceso+'.xml',factura_firmada,  {
+							encoding: "utf8",
+							flag: "w",
+							mode: 0o666
+						},(error)=>{
+							if (error)
+								console.log(error);
+							else {
+								console.log("XML FIRMADO\n");
+								console.log("LISTO PARA ENVIAR");
+								
+								//console.log(fs.readFileSync('./facturas/firmados/'+claveAcceso+'.xml', "utf8"));
+								//RegistrarFactura({xml:claveAcceso},{});
+							}
+						});
+					});*/
+				});
+		
+				
+			}
+		});
+		
+		/*
+		var a= fr.p_calcular_digito_modulo11(valr);
+		console.log(a);
+		//var b = fr.p_generar_factura_xml();
+		//console.log(b);
+		var c,e
+		c=fs.readFileSync('./facturas/generados/2104202101176000384000110010010000836331234567819.xml','Utf-8');
+		parseString(c,  "text/xml", function(error, result) {
+			//console.log(result);
+			var d =fr.p_generar_xades_bes(result)
+			
+			return result
+			//toXML(result)
+		});
+		*/
+		
+		//var c = fr.p_generar_xades_bes(b.d);
+
+
+		console.log(d);
+		//firmaelectronica('2104202101176000384000110010010000836331234567819');
+		
+		//RegistrarFactura(1,0);
+/*
+
+		arch='factura_V2.1.0.xml';
+		let xml;
+		let js;
+		/*
+			fs.readdir('./facturas/plantilla/', (error,files)=>{
+				if(error){
+					console.log('No existe el directorio');
+				}else{
+					fs.stat('./facturas/plantilla/' + arch, function (err) {
+						let path_arch;
+						if (!err) {
+							path_arch = './facturas/plantilla/' + arch;	
+						} else {
+							path_arch = './facturas/plantilla/factura_V2.1.0.xml';
+						}
+						xml= fs.readFileSync(path_arch,'UTF-8');
+						//console.log(xml);
+						parseString(xml, { explicitArray: false }, function(error, result) {
+							//console.log(result);
+							js=Object.assign(result);
+							var a = claveAcceso();
+							//console.log(a);
+							//configurando el archivo de correo
+							js.factura.infoTributaria.claveAcceso=a.toString();
+							//console.log(js);
+							var xmlresult=toXML(js);
+							//console.log(xmlresult);
+							fs.writeFile('./facturas/generados/'+a+'.xml',xmlresult,  {
+								encoding: "utf8",
+								flag: "w",
+								mode: 0o666
+							  },(error)=>{
+								if (error)
+									console.log(error);
+								else {
+									console.log("File written successfully\n");
+									console.log("The written has the following contents:");
+									
+									//console.log(fs.readFileSync('./facturas/generados/'+a+'.xml', "utf8"));
+								}
+							});
+
+							firmaelectronica(a);
+
+						});
+						
+					});
+				}
+				
+			});*/
+			
+			//var ejem=fs.readFileSync('./facturas/generados/2702202301080200986000120011000000000041524132219.xml','Utf-8');
+			
+			//ejem=Buffer.from(ejem, 'base64');
+			//console.log('2',ejem);
+			/*var x=''
+			for(var i=0; i<=ejem.length;i++){
+				x=x+ejem[i];
+			}
+			//console.log(x);
+			//var j=Buffer.from(fs.readFileSync('./facturas/generados/2702202301080200986000120011000000000041524132219.xml'),'Utf-8');
+			//console.log(j);
+			/*
+			
+			//ejem=btoa(ejem);
+			//
+			args.xml=ejem;
+			var k=btoa(j);
+			const bytes = Uint8Array.from({ length: ejem.length }, (element, index) =>
+				ejem.charCodeAt(index)
+			);
+			const charCodes = new Uint16Array(bytes.buffer)
+			//console.log("981",bytes);
+
+			const buffer = new ArrayBuffer(ejem.length);
+			//console.log(buffer);
+			const view = new Uint8Array.from(j);
+			//console.log(view);
+			*/
+			//args={'xml':new Array(ejem)};
+			//console.log(args);
+			
+			/*soap.createClientAsync(urlrecep).then((client) => {
+				
+				
+				client.wsdl.xml=ejem
+				//console.log(client)
+				//console.log(client.wsdl.xml);
+				//console.log(client.wsdl.definitions);
+				//claveAcceso();
+
+				client.validarComprobante(client.wsdl.xml,'2702202301080200986000120011000000000041524132219',(error,result)=>{
+					
+					if(error==null){
+						console.log("Resultado",result);
+						console.log("Resultado", result.RespuestaRecepcionComprobante);
+						console.log("Resultado", result.RespuestaRecepcionComprobante.estado);
+						console.log("Resultado", result.RespuestaRecepcionComprobante.comprobantes);
+						console.log("Resultado", result.RespuestaRecepcionComprobante.comprobantes.comprobante.mensajes);
+						return result
+					}else{
+						console.log("Error",error);
+					}
+					
+				});
+				
+			});*/
+			
+			// async/await
+			//var client = await soap.createClientAsync(urlrecep);
+			//console.log("995",client);
+			/*
+			var result = await client.validarComprobanteAsync(args,(error, result1)=>{
+				console.log("997 Error",error.RespuestaRecepcionComprobante);
+				console.log("997 result",result1.RespuestaRecepcionComprobante);
+			});*/
+			//console.log("1000",result);
+	} catch (error) {
+		
+	}
+}
+
+
+
+
+
 const obtener_detalles_por_estudiante = async function (req, res) {
 	if (req.user) {
 		let conn = mongoose.connection.useDb(req.user.base);

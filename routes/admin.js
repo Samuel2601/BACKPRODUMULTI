@@ -56,9 +56,15 @@ api.post('/registro_compra_manual_estudiante',auth.auth,AdminController.registro
 api.get('/listar_admin',auth.auth,AdminController.listar_admin);
 api.get('/listar_registro',auth.auth,AdminController.listar_registro);
 api.put('/actualizar_admin/:id',auth.auth,AdminController.actualizar_admin);
+
 api.post('/registro_admin',auth.auth,AdminController.registro_admin);
+
 api.get('/obtener_admin/:id',auth.auth,AdminController.obtener_admin);
 api.get('/eliminar_admin/:id',auth.auth,AdminController.eliminar_admin);
 api.get('/eliminar_estudiante_admin/:id',auth.auth,AdminController.eliminar_estudiante_admin);
 api.get('/reactivar_estudiante_admin/:id',auth.auth,AdminController.reactivar_estudiante_admin);
+
+api.put('/actualizzas_dash',auth.auth,AdminController.actualizzas_dash);
+api.get('/getDashboar_estudiante',auth.auth,AdminController.getDashboar_estudiante);
+
 module.exports = api;

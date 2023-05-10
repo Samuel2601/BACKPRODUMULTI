@@ -49,6 +49,63 @@ Dpago=conn.model('dpago',DpagoSchema);
 */
 var mongoose = require('mongoose');
 
+
+const getDashboar_estudiante = async function (req, res) {
+	if (req.user) {
+		try {
+			let obj=''
+			let ms=''
+			const filePath = './uploads/dashboar_estudiante.json'
+
+			if (fs.existsSync(filePath)) {
+				fs.stat(filePath, (err, stat) => {
+					if (err) {
+					  // Manejar el error aquí
+					  return res.status(400).json({ message: 'Algo salio mal' + err });
+					} else if (stat.size === 0) {
+					  console.log('El archivo JSON está vacío');
+					} else {
+					  // El archivo no está vacío, se puede analizar sin problemas
+					  const contenido = fs.readFileSync(filePath, 'utf8');
+					  obj = JSON.parse(contenido);
+					  
+					}
+				  });
+
+				
+				
+			}else{
+				ms='No existe el archivo';
+			}
+			return res.status(200).json({ obj: obj, ms:ms });
+		} catch (error) {
+			return res.status(400).json({ message: 'Algo salio mal' + error });
+		}
+	}
+}
+
+const actualizzas_dash = async function (req, res) {
+	if (req.user) {
+		try {
+			
+			const filePath = './uploads/dashboar_estudiante.json'
+			const fileContent =JSON.stringify(req.body);
+
+			if (!fs.existsSync(filePath)) {
+				
+			fs.writeFileSync(filePath, fileContent);
+			}else{
+				
+				fs.writeFileSync(filePath, fileContent);
+			}
+			return res.status(200).json({ message: 'Guardado con exito' });
+		} catch (error) {
+			
+			return res.status(400).json({ message: 'Algo salio mal' + error });
+		}
+	}
+}
+
 const forgotpassword = async function (req, res) {
 	var data = req.body;
 	//console.log(req.body);
@@ -1282,12 +1339,11 @@ const obtener_detallespagos_admin = async function (req, res) {
 			Dpago = conn.model('dpago', DpagoSchema);
 			let detalle = [];
 			let pagosd=[];
-			detalle = await Dpago.find()
-				.populate('idpension')
-				.populate('documento')
-				.populate('pago')
-				.populate('estudiante');
+			
 			if(id!='null'){
+				detalle = await Dpago.find()
+				.populate('idpension')
+				.populate('pago');
 				detalle.forEach(element => {
 					if(new Date(element.idpension.anio_lectivo).getTime()==new Date(id).getTime()){
 						pagosd.push(element);
@@ -1295,6 +1351,8 @@ const obtener_detallespagos_admin = async function (req, res) {
 				});
 				res.status(200).send({ data: pagosd });
 			}else{
+				detalle = await Dpago.find()
+				.populate('idpension');
 				res.status(200).send({ data: detalle });
 			}
 			
@@ -1359,18 +1417,35 @@ const obtener_becas_conf = async function (req, res) {
 			let conn = mongoose.connection.useDb(req.user.base);
 			Pension = conn.model('pension', PensionSchema);
 			Pension_Beca = conn.model('pension_beca', Pension_becaSchema);
+			Config = conn.model('config', ConfigSchema);
 			
 			var id = req.params['id'];
 
+			let config=await Config.findById(id);
+			//console.log(config);
+
+			let pens=[];
+			var pens2=await Pension.find();
+			pens2.forEach(element => {
+				if(element.idanio_lectivo==id){
+					pens.push(element);
+				}
+				
+			});
+			
 			var becas = await Pension_Beca.find().populate('idpension');
+			
 			let becasconfig=[];
 			becas.forEach(element => {
-				if(element.idpension.idanio_lectivo==id){
+				//element.idpension.idanio_lectivo==id
+				if( element.idpension.idanio_lectivo==id){
 					becasconfig.push(element);
 				}
 			});
 
-			res.status(200).send({ becas, becasconfig });
+			//console.log(becasconfig);
+
+			res.status(200).send({ becas: becasconfig});
 		} catch (error) {
 			res.status(200).send({ message: 'Algo salio mal' });
 		}
@@ -1402,6 +1477,8 @@ const obtener_detalles_ordenes_rubro = async function (req, res) {
 };
 var soap = require('soap');
 const { parseString, Builder } = require ('xml2js');
+
+
 function toJson(xml) {
 	parseString(xml, { explicitArray: false }, function(error, result) {
 		//console.log(result);
@@ -1432,15 +1509,15 @@ const marcar_finalizado_orden = async function (req, res) {
 			var url_validar='http://181.113.65.229:7071/WS/Facturador?wsdl';
 			soap.createClient(url_validar,function(err,client){
 				if(err){
-					console.log(err);
+					console.log("ERROR CLIENTE:",err);
 				}else{
 					//console.log(client);
 					client.GenerarFactura(data, function(err1,result){
 						if(err1){
-							console.log(err);
+							console.log("ERROR:", err);
 						}else{
 							//console.log(result);
-							//console.log(result.respuesta.respuestaGenerada);
+							console.log("RESPUESTA: ",result.respuesta.respuestaGenerada);
 							if(result.respuesta.respuestaGenerada=='Transaccion Exitosa'&&result.respuesta.respuestaTransaccion=='OK'){
 								
 								cambiar_estado(id,req.user.base,req.user.sub,data);
@@ -2272,5 +2349,7 @@ module.exports = {
 	obtener_detallespagos_pension_admin,
 	listar_registro,
 	obtener_detalles_ordenes_rubro,
-	actualizar_firma_electronica
+	actualizar_firma_electronica,
+	getDashboar_estudiante,
+	actualizzas_dash
 };

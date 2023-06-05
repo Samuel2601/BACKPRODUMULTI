@@ -21,6 +21,7 @@ let Registro = require('../models/Registro');
 let Admin = require('../models/Admin');
 let AdminInstituto = require('../models/AdminInstituto');
 let Institucion = require('../models/Institucion');
+let Proveedor = require('../models/Proveedor');
 
 const ConfigSchema = require('../models/Config');
 const FacturaSchema = require('../models/Facturacion');
@@ -34,6 +35,7 @@ const DpagoSchema = require('../models/Dpago');
 const Pension_becaSchema = require('../models/Pension_Beca');
 const DocumentoSchema = require('../models/Documento');
 const InstitucionSchema = require('../models/Institucion');
+const ProveedorSchema = require('../models/Proveedor');
 /*
 let conn = mongoose.connection.useDb(req.user.base);
 
@@ -2351,5 +2353,5 @@ module.exports = {
 	obtener_detalles_ordenes_rubro,
 	actualizar_firma_electronica,
 	getDashboar_estudiante,
-	actualizzas_dash
+	actualizzas_dash,
 };

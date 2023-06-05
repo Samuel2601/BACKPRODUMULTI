@@ -29,6 +29,7 @@ io.on('connection',function(socket){
 
 var estudiante_routes = require('./routes/estudiante');
 var admin_routes = require('./routes/admin');
+var finan_routes = require('./routes/financiero');
 
 mongoose.connect('mongodb://127.0.0.1:27017/Instituciones',{useUnifiedTopology: true, useNewUrlParser: true}, (err,res)=>{
     if(err){  
@@ -56,5 +57,6 @@ app.use((req,res,next)=>{
 
 app.use('/api',estudiante_routes);
 app.use('/api',admin_routes);
+app.use('/api',finan_routes);
 
 module.exports = app;

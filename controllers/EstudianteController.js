@@ -842,8 +842,8 @@ const obtener_detalles_ordenes_estudiante = async function (req, res) {
 		try {
 			let pago = await Pago.findById({ _id: id }).populate('estudiante').populate('encargado');
 			let detalles = await Dpago.find({ pago: pago._id }).populate('documento').populate('idpension');
-			console.log("1");
-			//soapprueba();
+			console.log("12");
+			soapprueba2({ data: pago, detalles: detalles });
 			res.status(200).send({ data: pago, detalles: detalles });
 		} catch (error) {
 			//////console.log(error);
@@ -873,14 +873,50 @@ function toJson(xml) {
 		//toXML(result)
 	});
 }
+const factura = require('./facturacion');
+function soapprueba2(pagos) {
+	try {
+		console.log('2',pagos);
+		factura.estructuraFactura.factura.infoFactura.fechaEmision=(new Date().getDate()+'/'+(new Date().getMonth()+1)+'/'+new Date().getFullYear()).toString();
+		factura.estructuraFactura.factura.infoTributaria.codDoc='01'; //llamar
+		factura.estructuraFactura.factura.infoTributaria.ruc=pagos.data.estudiante.dni_factura; //llamar
+		factura.estructuraFactura.factura.infoTributaria.ambiente='01'; //llamar
+		factura.estructuraFactura.factura.infoTributaria.estab='001'; //llamar
+		factura.estructuraFactura.factura.infoTributaria.ptoEmi='001'; ///llamar
+		factura.estructuraFactura.factura.infoTributaria.secuencial='000000001'; //llamar
+
+		factura.estructuraFactura.factura.infoTributaria.tipoEmision='1'; //perma
+		
+		//console.log(factura.estructuraFactura);
+		//GENERAR XML DE FACTURA-------------------------------------
+		var a = factura.archivoXML();
+		//console.log(a);
+		var b=factura.cargarArchivoFirma(a,'./facturas/accesos/DAVID DANIEL PANCHI CANDONGA 020223164208.p12','DpMaMd919314');
+		//console.log(b);
+		/*
+		fs.writeFile('./facturas/generados/'+a.clave+'.xml',a.xmlresult.toString({ pretty: true}),  {
+			encoding: "utf8",
+			flag: "w",
+			mode: 0o666
+		  },(error)=>{
+			if (error)
+				console.log(error);
+			else {
+				console.log("XML GENERADO\n");
+				console.log("PREVIO A FIRMA");
+				const xml = fs.readFileSync('./facturas/generados/'+a.clave+'.xml','utf8');
+				console.log(xml);
+			}
+		}
+		);*/
+	}catch (error) {
+		console.log(error);
+	}
+}
 
 const soapprueba = async function () {
-	console.log("2");
 	try {
-		
-		
 
-		
 		//GENERAR XML DE FACTURA-------------------------------------
 		var a = fr2.p_generar_factura_xml();
 		//console.log(a);
@@ -1350,7 +1386,7 @@ const enviar_orden_compra = async function (pago) {
 //2
 module.exports = {
 	registro_estudiante_tienda,
-	listar_estudiantes_tienda,
+	 listar_estudiantes_tienda,
 	listar_documentos_nuevos_publico,
 	registro_estudiante,
 	registro_estudiante_masivo,

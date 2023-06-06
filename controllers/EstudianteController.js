@@ -17,6 +17,7 @@ let Pension = require('../models/Pension');
 let Registro = require('../models/Registro');
 let Admin = require('../models/Admin');
 let AdminInstituto = require('../models/AdminInstituto');
+let Facturacion = require('../models/Facturacion');
 
 const ConfigSchema = require('../models/Config');
 const AdminInstitutoSchema = require('../models/AdminInstituto');
@@ -28,6 +29,7 @@ const EstudianteSchema = require('../models/Estudiante');
 const DpagoSchema = require('../models/Dpago');
 const Pension_becaSchema = require('../models/Pension_Beca');
 const DocumentoSchema = require('../models/Documento');
+const FacturacionSchema  = require('../models/Facturacion');
 
 var mongoose = require('mongoose');
 
@@ -837,13 +839,17 @@ const obtener_detalles_ordenes_estudiante = async function (req, res) {
 		Documento = conn.model('document', DocumentoSchema);
 		Pension = conn.model('pension', PensionSchema);
 		Dpago = conn.model('dpago', DpagoSchema);
+
+		Facturacion = conn.model('facturacion', FacturacionSchema);
+		ctacon = await Facturacion.find({});
+
 		var id = req.params['id'];
 		//////console.log(id.toString());
 		try {
 			let pago = await Pago.findById({ _id: id }).populate('estudiante').populate('encargado');
 			let detalles = await Dpago.find({ pago: pago._id }).populate('documento').populate('idpension');
 			console.log("12");
-			soapprueba2({ data: pago, detalles: detalles });
+			soapprueba2({ data: pago, detalles: detalles,conf_fact:ctacon[0], base:req.user.base});
 			res.status(200).send({ data: pago, detalles: detalles });
 		} catch (error) {
 			//////console.log(error);
@@ -876,22 +882,65 @@ function toJson(xml) {
 const factura = require('./facturacion');
 function soapprueba2(pagos) {
 	try {
+		
 		console.log('2',pagos);
 		factura.estructuraFactura.factura.infoFactura.fechaEmision=(new Date().getDate()+'/'+(new Date().getMonth()+1)+'/'+new Date().getFullYear()).toString();
-		factura.estructuraFactura.factura.infoTributaria.codDoc='01'; //llamar
+		
+		factura.estructuraFactura.factura.infoTributaria.codDoc=pagos.conf_fact.codDoc; //llamar
 		factura.estructuraFactura.factura.infoTributaria.ruc=pagos.data.estudiante.dni_factura; //llamar
-		factura.estructuraFactura.factura.infoTributaria.ambiente='01'; //llamar
-		factura.estructuraFactura.factura.infoTributaria.estab='001'; //llamar
-		factura.estructuraFactura.factura.infoTributaria.ptoEmi='001'; ///llamar
-		factura.estructuraFactura.factura.infoTributaria.secuencial='000000001'; //llamar
+		factura.estructuraFactura.factura.infoTributaria.ambiente=pagos.conf_fact.ambiente; //llamar
+		factura.estructuraFactura.factura.infoTributaria.estab=pagos.conf_fact.estab; //llamar
+		factura.estructuraFactura.factura.infoTributaria.ptoEmi=pagos.conf_fact.ptoEmi; ///llamar
+		factura.estructuraFactura.factura.infoTributaria.secuencial=pagos.conf_fact.secuencial; //llamar
 
 		factura.estructuraFactura.factura.infoTributaria.tipoEmision='1'; //perma
 		
 		//console.log(factura.estructuraFactura);
 		//GENERAR XML DE FACTURA-------------------------------------
 		var a = factura.archivoXML();
-		//console.log(a);
-		var b=factura.cargarArchivoFirma(a,'./facturas/accesos/DAVID DANIEL PANCHI CANDONGA 020223164208.p12','DpMaMd919314');
+		console.log(a);
+		if (!fs.existsSync('./facturas/'+pagos.base+'/generados/')) {
+			fs.mkdirSync('./facturas/'+pagos.base+'/generados/', { recursive: true });
+		}
+
+		fs.writeFile('./facturas/'+pagos.base+'/generados/'+a.clave+'.xml',a.xml.toString({ pretty: true}),  {
+			encoding: "utf8",
+			flag: "w",
+			mode: 0o666
+		  },(error)=>{
+			if (error)
+				console.log(error);
+			else {
+				console.log("XML GENERADO\n");
+				console.log("PREVIO A FIRMA");
+				const xml = fs.readFileSync('./facturas/'+pagos.base+'/generados/'+a.clave+'.xml','utf8');
+				//console.log(xml);
+				var b=factura.cargarArchivoFirma(a.xml,'./facturas/'+pagos.base+'/accesos/'+pagos.conf_fact.archivo,pagos.conf_fact.password);
+				if (!fs.existsSync('./facturas/'+pagos.base+'/firmados/')) {
+					fs.mkdirSync('./facturas/'+pagos.base+'/firmados/', { recursive: true });
+				}
+
+				fs.writeFile('./facturas/'+pagos.base+'/firmados/'+a.clave+'.xml',b.toString({ pretty: true}),  {
+					encoding: "utf8",
+					flag: "w",
+					mode: 0o666
+				  },(error)=>{
+					if (error)
+						console.log(error);
+					else {
+						console.log("XML GENERADO\n");
+						console.log("Listo para enviar");
+						
+						
+					}
+				}
+				);
+			}
+		}
+		);
+
+
+		
 		//console.log(b);
 		/*
 		fs.writeFile('./facturas/generados/'+a.clave+'.xml',a.xmlresult.toString({ pretty: true}),  {

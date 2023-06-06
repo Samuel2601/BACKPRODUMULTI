@@ -122,9 +122,10 @@ const estructuraFactura = {
 };
 
 function archivoXML(){
-    let ca=generarClaveScceso();
-    console.log(ca);
-    return xmlbuilder.create(estructuraFactura).end({ pretty: true });
+    let clave=generarClaveScceso();
+    //console.log(ca);
+    let xml=xmlbuilder.create(estructuraFactura).end({ pretty: true });
+    return {xml,clave};
 }
 function generarClaveScceso(){
     // Generar la clave de acceso
@@ -162,19 +163,21 @@ function calcularDigitoVerificador(claveAcceso) {
 }
 
 function cargarArchivoFirma(xml,ruta, password) {
-    var dsig = new Dsig(ruta);
+    console.log(ruta);
     let result;
     try {
+        var dsig = new Dsig(ruta);
         dsig.openSession(password);
         //console.log(xml);
         console.log('........................................');
         result = dsig.computeSignature(xml);
         console.log(result); 
-        console.log('........................................');       
-    } catch(e) {
-        console.error(e);
+        console.log('........................................');   
+        dsig.closeSession();    
+    } catch(err) {
+        console.log("ERROR FIRMA:",err);
     } finally {
-        dsig.closeSession();
+        
         return result;
     }
 }
